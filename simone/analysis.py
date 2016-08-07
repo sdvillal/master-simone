@@ -5,6 +5,8 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 from functools import partial
 from itertools import product
+
+from simone import MY_DIR
 from simone import staircases, DATA_DIR
 
 if __name__ == '__main__':
@@ -54,6 +56,6 @@ if __name__ == '__main__':
             sns.distplot(label_df[summarizer], label=label, hist=False, rug=True, ax=top)
             sns.kdeplot(label_df[summarizer], label=label, shade=True, cumulative=True, ax=bottom)
         plt.suptitle(label_name, fontsize=20)
-        plt.savefig(op.join(DATA_DIR, '%s-%s-distro.png' % (label_name, summarizer)))
+        plt.savefig(op.join(MY_DIR, 'figures', '%s-%s-distro.png' % (label_name, summarizer)))
         plt.close()
     plt.show()

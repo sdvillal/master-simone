@@ -91,4 +91,4 @@ quicker to have a skype chat, let me know.
 --------------------------------------------------------------------------------
 """
 
-from .munging import staircases, DATA_DIR
+from .munging import staircases, MY_DIR, DATA_DIR
