@@ -10,6 +10,11 @@ dependencies:
   - seaborn
   - openpyxl
   - future
+  - ipywidgets
+  - pytz
+  - six
+  - python-dateutil
   - pip:
     - argh
+    - qgrid
 
