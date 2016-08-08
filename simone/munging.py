@@ -309,11 +309,17 @@ def _munge_from_simone_excel(xlsx=LATEST_XLSX):
     # N.B. exp_start is wrong for method 2 (double revelsals);
     # Sim should put "start" on top of experiments
 
-    # Cache
+    # Cache, html
     trials_df.to_html(op.join(DATA_DIR, 'trials.html'))
     colors_df.to_html(op.join(DATA_DIR, 'colors.html'))
     users_df.to_html(op.join(DATA_DIR, 'users.html'))
     exps_df.drop('series', axis=1).to_html(op.join(DATA_DIR, 'experiments.html'))
+    # Cache, excel
+    trials_df.to_excel(op.join(DATA_DIR, 'trials.xlsx'))
+    colors_df.to_excel(op.join(DATA_DIR, 'colors.xlsx'))
+    users_df.to_excel(op.join(DATA_DIR, 'users.xlsx'))
+    exps_df.drop('series', axis=1).to_excel(op.join(DATA_DIR, 'experiments.xlsx'))
+    # Cache, pickle (here we do save the useful "series" column in the experiments table)
     trials_df.to_pickle(op.join(DATA_DIR, 'trials.pkl'))
     colors_df.to_pickle(op.join(DATA_DIR, 'colors.pkl'))
     users_df.to_pickle(op.join(DATA_DIR, 'users.pkl'))
