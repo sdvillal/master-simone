@@ -37,6 +37,8 @@ def _munge_from_simone_excel(xlsx=LATEST_XLSX):
     import openpyxl
     wb = openpyxl.load_workbook(xlsx, read_only=True, data_only=True)
     assert set(wb.get_sheet_names()) == {'Results Lum Lab',
+                                         'Results lum scene',
+                                         'Results lum wall',
                                          'Analysis col',
                                          'INTRA-P VAR col',
                                          'L_a_b',
@@ -48,8 +50,10 @@ def _munge_from_simone_excel(xlsx=LATEST_XLSX):
         # N.B. 'L_a_b' is hidden in the xlsx that Simone sent
         # There are also many hidden rows in there, with contradictory info...
         # So careful
-        results_sheet = wb['Results Lum Lab']
         lab_sheet = wb['L_a_b']
+        results_sheet = wb['Results Lum Lab']
+        lum_wall_sheet = wb['Results lum wall']
+        lum_scene_sheet = wb['Results lum scene']
         lab_colors = []
         for row in lab_sheet.rows:
             if row[1].value is not None and row[10].value is not None:
@@ -76,13 +80,18 @@ def _munge_from_simone_excel(xlsx=LATEST_XLSX):
         lab_df = pd.DataFrame(lab_colors, columns=['name', 'full_name',
                                                    'measured_l', 'measured_a', 'measured_b',
                                                    'photoshop_l', 'photoshop_a', 'photoshop_b'])
+        # Add some info from the result xxx sheets
         colors = []
         for row in [3, 4, 5] + range(8, 37):
             name = results_sheet.cell(row=row, column=1).value
             measured_luminance = results_sheet.cell(row=row, column=2).value
+            measured_wall_luminance = lum_wall_sheet.cell(row=row, column=2).value
+            measured_scene_luminance = lum_scene_sheet.cell(row=row, column=2).value
             colors.append(dict(
                 name=name,
-                luminance=measured_luminance,
+                luminance=measured_luminance,  # will use this to sanity check
+                measured_wall_l=measured_wall_luminance,
+                measured_scene_l=measured_scene_luminance,
                 achromatic=name.startswith('M'),
                 step=None
             ))
@@ -104,7 +113,8 @@ def _munge_from_simone_excel(xlsx=LATEST_XLSX):
 
         return colors_df[['name', 'full_name', 'achromatic', 'step_index', 'step',
                           'measured_l', 'measured_a', 'measured_b',
-                          'photoshop_l', 'photoshop_a', 'photoshop_b']].set_index('name')
+                          'photoshop_l', 'photoshop_a', 'photoshop_b',
+                          'measured_wall_l', 'measured_scene_l']].set_index('name')
 
     colors_df = munge_colors()
 
@@ -251,13 +261,16 @@ def _munge_from_simone_excel(xlsx=LATEST_XLSX):
     # http://stackoverflow.com/questions/20206615/how-can-a-pandas-merge-preserve-order
     num_trials = len(trials_df)
     trials_df = (trials_df.
-                 merge(colors_df[['measured_l', 'measured_a', 'measured_b']],
+                 merge(colors_df[['measured_l', 'measured_a', 'measured_b',
+                                  'measured_wall_l', 'measured_scene_l']],
                        left_on='achromatic', right_index=True,
                        how='left').
                  sort_index())
     trials_df = (trials_df.
-                 merge(colors_df[['measured_l', 'measured_a', 'measured_b']],
-                       left_on='chromatic', right_index=True, suffixes=['_achromatic', '_chromatic'],
+                 merge(colors_df[['measured_l', 'measured_a', 'measured_b',
+                                  'measured_wall_l', 'measured_scene_l']],
+                       left_on='chromatic', right_index=True,
+                       suffixes=['_achromatic', '_chromatic'],
                        how='left').
                  sort_index())
     assert len(trials_df) == num_trials
