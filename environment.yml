@@ -1,0 +1,14 @@
+name: example-environment
+
+dependencies:
+  - python=2.7
+  - numpy
+  - scipy
+  - pandas
+  - matplotlib
+  - seaborn
+  - openpyxl
+  - future
+  - pip:
+    - argh
+
