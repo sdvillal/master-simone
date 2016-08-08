@@ -2,6 +2,9 @@
 from __future__ import print_function
 from future.utils import string_types
 
+from functools import partial
+from itertools import product
+
 from collections import Counter
 import datetime
 import os.path as op
@@ -26,6 +29,59 @@ def _trials_to_exp(trials_df,
               for trial_metadata, trial_df in trials_df.groupby(exp_attributes)]
 
     return pd.DataFrame(trials, columns=exp_attributes + [series_columns_name])
+
+
+EXPS_NON_STAIRCASE_COLUMNS = [
+    'participant',
+    'staircase',
+    'staircase_repetition',
+    'reversal_method',
+    'omit',
+    'exp_start',
+    'age',
+    'gender',
+    'education',
+    'vision',
+    'chromatic',
+    'chromatic_first',
+    'measured_l_chromatic',
+    'measured_wall_l_chromatic',
+    'measured_scene_l_chromatic',
+    'wall_minus_scene_l_chromatic',
+    'series',
+]
+
+_LUMINANCES = [
+    'measured_l',
+    'measured_wall_l',
+    'measured_scene_l',
+    'wall_minus_scene_l',
+]
+
+_AGGREGATORS = dict(
+    mean=np.mean,
+    std=np.std,
+    min=np.min,
+    max=np.max,
+    range=lambda x: np.max(x) - np.min(x)
+)
+
+_LASTS = [1, 2, 3, 4, 5]
+
+
+def _aggregate_last_reversals(df,
+                              column='measured_l_achromatic',
+                              aggregators=None,
+                              num_reversals=3):
+    def name(agg):
+        # N.B. if studying the effect of taking last x reversals, we will need to tidy column names into a new column
+        return '%s__%s__last%d' % (column, agg, num_reversals)
+    if aggregators is None:
+        aggregators = _AGGREGATORS
+    if df.reversal.sum() < num_reversals:
+        return pd.Series({name(agg_name): np.nan for agg_name in aggregators})
+    return pd.Series({name(agg_name): agg(df[df.reversal][column].values[-num_reversals:])
+                      for agg_name, agg in aggregators.items()})
 
 
 def _munge_from_simone_excel(xlsx=LATEST_XLSX):
@@ -111,16 +167,18 @@ def _munge_from_simone_excel(xlsx=LATEST_XLSX):
         assert abs(lum_range - 29.644179823) - 1E-9
         assert np.allclose(colors_df.luminance, colors_df.measured_l)
 
-        return colors_df[['name', 'full_name', 'achromatic', 'step_index', 'step',
-                          'measured_l', 'measured_a', 'measured_b',
-                          'photoshop_l', 'photoshop_a', 'photoshop_b',
-                          'measured_wall_l', 'measured_scene_l']].set_index('name')
+        colors_df = colors_df[['name', 'full_name', 'achromatic', 'step_index', 'step',
+                               'measured_l', 'measured_a', 'measured_b',
+                               'photoshop_l', 'photoshop_a', 'photoshop_b',
+                               'measured_wall_l', 'measured_scene_l']].set_index('name')
+        colors_df['wall_minus_scene_l'] = colors_df.measured_wall_l - colors_df.measured_scene_l
+        return colors_df
 
     colors_df = munge_colors()
 
-    # --- Munge users information
+    # --- Munge participants information
 
-    def munge_users(num_users=35):
+    def munge_participants(num_participants=35):
         subjects_sheet = wb['Analysis col']
         #
         # Adds subject X (also known as Mr. C)
@@ -147,7 +205,7 @@ def _munge_from_simone_excel(xlsx=LATEST_XLSX):
         def must_omit(omit):
             return omit is not None and omit.startswith('OMIT')
 
-        for column in range(11, num_users * 2 + 10, 2):
+        for column in range(11, num_participants * 2 + 10, 2):
             date = subjects_sheet.cell(row=3, column=column).value
             time = subjects_sheet.cell(row=5, column=column).value
             if isinstance(time, string_types) and ';' in time:
@@ -170,7 +228,7 @@ def _munge_from_simone_excel(xlsx=LATEST_XLSX):
                                        'gender',
                                        'education',
                                        'vision']].set_index('subject_id')
-    users_df = munge_users()
+    participants_df = munge_participants()
 
     # --- Munge trials information
 
@@ -273,13 +331,13 @@ def _munge_from_simone_excel(xlsx=LATEST_XLSX):
     num_trials = len(trials_df)
     trials_df = (trials_df.
                  merge(colors_df[['measured_l', 'measured_a', 'measured_b',
-                                  'measured_wall_l', 'measured_scene_l']],
+                                  'measured_wall_l', 'measured_scene_l', 'wall_minus_scene_l']],
                        left_on='achromatic', right_index=True,
                        how='left').
                  sort_index())
     trials_df = (trials_df.
                  merge(colors_df[['measured_l', 'measured_a', 'measured_b',
-                                  'measured_wall_l', 'measured_scene_l']],
+                                  'measured_wall_l', 'measured_scene_l', 'wall_minus_scene_l']],
                        left_on='chromatic', right_index=True,
                        suffixes=['_achromatic', '_chromatic'],
                        how='left').
@@ -294,7 +352,7 @@ def _munge_from_simone_excel(xlsx=LATEST_XLSX):
                'staircase_repetition',
                'reversal_method']
     exps_df = _trials_to_exp(trials_df, exp_attributes=exp_key)
-    exps_df = exps_df.merge(users_df, how='left',
+    exps_df = exps_df.merge(participants_df, how='left',
                             left_on='participant', right_index=True)
     exps_df = exps_df.sort_values(exp_key)
 
@@ -306,33 +364,46 @@ def _munge_from_simone_excel(xlsx=LATEST_XLSX):
     exps_df['chromatic_first'] = exps_df.staircase.str.startswith('C')
     exps_df = exps_df[[col for col in exps_df.columns if col != 'series'] + ['series']]
 
+    # Add here summaries for the staircases, so Sim does not need to worry about these computations
+    exps_df = exps_df.merge(colors_df[_LUMINANCES], left_on='chromatic', right_index=True)
+    exps_df = exps_df.rename(columns={col: col + '_chromatic' for col in _LUMINANCES})
+    aggs = [partial(_aggregate_last_reversals, num_reversals=num_reversals, column=column + '_achromatic')
+            for num_reversals, column in product(_LASTS, _LUMINANCES)]
+    for agg in aggs:
+        exps_df = exps_df.merge(exps_df.series.apply(agg), left_index=True, right_index=True)
+    exps_df['staircase_length'] = exps_df.series.apply(len)
+
+    # Reorder slightly the columns, so "series" come right before the staircase summaries
+    staircases_summaries = [col for col in exps_df.columns if col not in EXPS_NON_STAIRCASE_COLUMNS]
+    exps_df = exps_df[EXPS_NON_STAIRCASE_COLUMNS + staircases_summaries]
+
     # N.B. exp_start is wrong for method 2 (double revelsals);
-    # Sim should put "start" on top of experiments
+    # Sim should put "start" on top of experiments, it is not a user attr.
 
     # Cache, html
     trials_df.to_html(op.join(DATA_DIR, 'trials.html'))
     colors_df.to_html(op.join(DATA_DIR, 'colors.html'))
-    users_df.to_html(op.join(DATA_DIR, 'users.html'))
+    participants_df.to_html(op.join(DATA_DIR, 'participants.html'))
     exps_df.drop('series', axis=1).to_html(op.join(DATA_DIR, 'experiments.html'))
     # Cache, excel
     trials_df.to_excel(op.join(DATA_DIR, 'trials.xlsx'))
     colors_df.to_excel(op.join(DATA_DIR, 'colors.xlsx'))
-    users_df.to_excel(op.join(DATA_DIR, 'users.xlsx'))
+    participants_df.to_excel(op.join(DATA_DIR, 'participants.xlsx'))
     exps_df.drop('series', axis=1).to_excel(op.join(DATA_DIR, 'experiments.xlsx'))
     # Cache, pickle (here we do save the useful "series" column in the experiments table)
     trials_df.to_pickle(op.join(DATA_DIR, 'trials.pkl'))
     colors_df.to_pickle(op.join(DATA_DIR, 'colors.pkl'))
-    users_df.to_pickle(op.join(DATA_DIR, 'users.pkl'))
+    participants_df.to_pickle(op.join(DATA_DIR, 'participants.pkl'))
     exps_df.to_pickle(op.join(DATA_DIR, 'experiments.pkl'))
 
-    return colors_df, users_df, trials_df, exps_df
+    return colors_df, participants_df, trials_df, exps_df
 
 
 def staircases(recache=False):
     """
     Returns 4 dataframes with all the data from the experiments:
-      - users: each row contains an user information
       - colors: each row contains a color information
+      - participants: each row contains a participant information
       - trials: each row contains a trial (here a single decision of which color is brighter)
       - experiments: each row is an experiment;
         contains a special column, "series", with all the trials of the experiment sorted
@@ -346,11 +417,11 @@ def staircases(recache=False):
     try:
         if recache:
             raise Exception()
-        users_df = pd.read_pickle(op.join(DATA_DIR, 'users.pkl'))
-        colors_df = pd.read_pickle(op.join(DATA_DIR, 'users.pkl'))
+        colors_df = pd.read_pickle(op.join(DATA_DIR, 'colors.pkl'))
+        participants_df = pd.read_pickle(op.join(DATA_DIR, 'participants.pkl'))
         trials_df = pd.read_pickle(op.join(DATA_DIR, 'trials.pkl'))
         exps_df = pd.read_pickle(op.join(DATA_DIR, 'experiments.pkl'))
-        return colors_df, users_df, trials_df, exps_df
+        return colors_df, participants_df, trials_df, exps_df
     except Exception:
         return _munge_from_simone_excel()
 
