@@ -122,7 +122,18 @@ def _munge_from_simone_excel(xlsx=LATEST_XLSX):
 
     def munge_users(num_users=35):
         subjects_sheet = wb['Analysis col']
+        #
         # Adds subject X (also known as Mr. C)
+        # TODO: add actual data and data for simple reversals. From Sim:
+        # ----------------------
+        # - The other thing is that for participant 0 I have participant and experiment
+        #   time details as well and data for staircase with single reversals
+        #   (personal details in cells colum CS of sheet 'Analysis Col' and Data for
+        #    staircase with single reversals in columns CP & CQ for the same sheet ).
+        #   It's probably good to include, not for the main analysis but for a comparsion
+        #   of a result from an trained observer.
+        # ----------------------
+        #
         subjects = [dict(
             subject_id=0,
             omit=True,
