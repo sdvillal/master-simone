@@ -235,8 +235,7 @@ def _munge_from_simone_excel(xlsx=LATEST_XLSX):
     def munge_trials():
         results_sheet = wb['Results Lum Lab']
         response_matcher = re.compile(r'(.*)-(.*):(.*)')
-        response_columns = [(7, 0), (8, 0), (9, 0), (10, 0), (11, 0), (12, 0),
-                            (15, 1), (16, 1), (17, 1), (18, 1), (19, 1), (20, 1)]
+        response_columns = [(7, 0), (8, 0), (9, 0), (10, 0), (11, 0), (12, 0)]
         current_participant = 0
         current_step_index = 0
         current_reversal_method = 'simple-reversals'
