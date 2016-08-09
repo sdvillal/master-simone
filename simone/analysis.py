@@ -5,11 +5,12 @@ from itertools import product
 import matplotlib.pyplot as plt
 import seaborn as sns
 
-from simone import MY_DIR, staircases, EXPS_NON_STAIRCASE_COLUMNS
+from simone import MY_DIR, EXPS_NON_STAIRCASE_COLUMNS
+from simone.munging import read_experiments_df
 
 if __name__ == '__main__':
 
-    colors_df, participants_df, trials_df, exps_df = staircases()
+    exps_df = read_experiments_df()
 
     # Usually you only need to work witht exps_df.
     # exps_df contains the experiment data arranged one "experiment" per row

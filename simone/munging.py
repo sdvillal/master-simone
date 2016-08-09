@@ -377,29 +377,32 @@ def _munge_from_simone_excel(xlsx=LATEST_XLSX):
     staircases_summaries = [col for col in exps_df.columns if col not in EXPS_NON_STAIRCASE_COLUMNS]
     exps_df = exps_df[EXPS_NON_STAIRCASE_COLUMNS + staircases_summaries]
 
+    # We do not care about that index...
+    exps_df = exps_df.reset_index(drop=True)
+
     # N.B. exp_start is wrong for method 2 (double revelsals);
     # Sim should put "start" on top of experiments, it is not a user attr.
 
     # Cache, html
-    trials_df.to_html(op.join(DATA_DIR, 'trials.html'))
     colors_df.to_html(op.join(DATA_DIR, 'colors.html'))
     participants_df.to_html(op.join(DATA_DIR, 'participants.html'))
-    exps_df.drop('series', axis=1).to_html(op.join(DATA_DIR, 'experiments.html'))
+    trials_df.to_html(op.join(DATA_DIR, 'trials.html'), index=False)
+    exps_df.drop('series', axis=1).to_html(op.join(DATA_DIR, 'experiments.html'), index=False)
     # Cache, excel
-    trials_df.to_excel(op.join(DATA_DIR, 'trials.xlsx'))
     colors_df.to_excel(op.join(DATA_DIR, 'colors.xlsx'))
     participants_df.to_excel(op.join(DATA_DIR, 'participants.xlsx'))
+    trials_df.to_excel(op.join(DATA_DIR, 'trials.xlsx'))
     exps_df.drop('series', axis=1).to_excel(op.join(DATA_DIR, 'experiments.xlsx'))
     # Cache, pickle (here we do save the useful "series" column in the experiments table)
-    trials_df.to_pickle(op.join(DATA_DIR, 'trials.pkl'))
     colors_df.to_pickle(op.join(DATA_DIR, 'colors.pkl'))
     participants_df.to_pickle(op.join(DATA_DIR, 'participants.pkl'))
+    trials_df.to_pickle(op.join(DATA_DIR, 'trials.pkl'))
     exps_df.to_pickle(op.join(DATA_DIR, 'experiments.pkl'))
 
     return colors_df, participants_df, trials_df, exps_df
 
 
-def staircases(recache=False):
+def read_all_data(recache=False):
     """
     Returns 4 dataframes with all the data from the experiments:
       - colors: each row contains a color information
@@ -426,6 +429,16 @@ def staircases(recache=False):
         return _munge_from_simone_excel()
 
 
+def read_experiments_df(recache=False):
+    try:
+        if recache:
+            raise Exception()
+        return pd.read_pickle(op.join(DATA_DIR, 'experiments.pkl'))
+    except Exception:
+        colors_df, participants_df, trials_df, exps_df = _munge_from_simone_excel()
+        return exps_df
+
+
 if __name__ == '__main__':
     import argh
-    argh.dispatch_command(staircases)
+    argh.dispatch_command(read_all_data)
