@@ -21,7 +21,7 @@ if __name__ == '__main__':
     # Select only some experiments
     exps_df = exps_df.query('not omit and '
                             'reversal_method == "simple-reversals" and '
-                            'staircase_repetition in [0, 1]')
+                            'staircase_repetition in [0]')
     label_names = ['age', 'gender', 'education', 'vision', 'chromatic', 'chromatic_first']
     staircases_summaries = [col for col in exps_df.columns
                             if col not in EXPS_NON_STAIRCASE_COLUMNS + ['series']]
