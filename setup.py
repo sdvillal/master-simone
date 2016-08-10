@@ -14,6 +14,7 @@ setup(
               'seaborn',
               'argh',
               'openpyxl',
-              'future']
+              'future',
+              'scikit-image']
 )
 
