@@ -438,6 +438,16 @@ def read_experiments_df(recache=False):
         return exps_df
 
 
+def read_colors_df(recache=False):
+    try:
+        if recache:
+            raise Exception()
+        return pd.read_pickle(op.join(DATA_DIR, 'colors.pkl'))
+    except Exception:
+        colors_df, participants_df, trials_df, exps_df = _munge_from_simone_excel()
+        return colors_df
+
+
 if __name__ == '__main__':
     import argh
     argh.dispatch_command(read_all_data)
